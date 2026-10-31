@@ -74,6 +74,29 @@ def test_audio_download_still_requires_a_format(tmp_path, monkeypatch):
     assert "ignore_no_formats_error" not in seen[0]
 
 
+def test_pot_provider_url_configures_the_bgutil_plugin(tmp_path):
+    s = make_settings(tmp_path, YTDLP_POT_PROVIDER_URL="http://pot.internal:4416/")
+    assert YouTubeClient(s)._base_opts()["extractor_args"] == {
+        "youtubepot-bgutilhttp": {"base_url": ["http://pot.internal:4416"]}
+    }
+
+
+def test_pot_provider_args_survive_a_player_client_override(tmp_path, monkeypatch):
+    from ytscrape.transcribe.youtube.url_parser import parse_video_ref
+
+    seen = _capture_ytdlp_opts(monkeypatch)
+    s = make_settings(tmp_path, YTDLP_POT_PROVIDER_URL="http://pot:4416")
+    YouTubeClient(s)._extract(
+        parse_video_ref("_0gtiMi5AzI"),
+        {"extractor_args": {"youtube": {"player_client": ["tv"]}}},
+        True,
+    )
+    assert seen[0]["extractor_args"] == {
+        "youtubepot-bgutilhttp": {"base_url": ["http://pot:4416"]},
+        "youtube": {"player_client": ["tv"]},
+    }
+
+
 def test_cookies_file_path_is_used_as_is(tmp_path):
     s = make_settings(tmp_path, YTDLP_COOKIES_FILE="/data/cookies.txt")
     assert str(s.cookies_file).replace("\\", "/") == "/data/cookies.txt"

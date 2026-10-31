@@ -76,6 +76,10 @@ transcribe = [
     "python-dotenv>=1.0",
     "rapidfuzz>=3.6",
     "yt-dlp>=2025.6.9",
+    # YouTube needs a JS runtime for its challenges, and a PO token on cloud IPs
+    "yt-dlp-ejs>=0.8",
+    "deno>=2.5",
+    "bgutil-ytdlp-pot-provider>=2.0",
 ]
 
 [project.urls]

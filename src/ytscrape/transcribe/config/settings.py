@@ -88,6 +88,7 @@ class Settings:
     # getting past YouTube's bot check on cloud IPs
     proxy: str = ""
     cookies_file: Path | None = None
+    pot_provider_url: str = ""
 
     # optional features
     enable_diarization: bool = False
@@ -152,6 +153,8 @@ class Settings:
                 _get(env, "HTTPS_PROXY", _get(env, "HTTP_PROXY", "")),
             ),
             cookies_file=_cookies_file(env, temp_dir),
+            # bgutil PO-token server (github.com/Brainicism/bgutil-ytdlp-pot-provider)
+            pot_provider_url=_get(env, "YTDLP_POT_PROVIDER_URL", "").rstrip("/"),
             enable_diarization=_bool(env, "ENABLE_DIARIZATION", False),
             enable_semantic_search=_bool(env, "ENABLE_SEMANTIC_SEARCH", False),
             log_level=_get(env, "LOG_LEVEL", "INFO").upper(),

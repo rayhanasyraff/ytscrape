@@ -41,6 +41,17 @@ class _QuietLogger:
         pass
 
 
+def _deno_path() -> str | None:
+    try:
+        from deno import find_deno_bin
+    except ImportError:
+        return None
+    try:
+        return find_deno_bin()
+    except FileNotFoundError:
+        return None
+
+
 def _normalize_info(info: dict) -> dict:
     upload = info.get("upload_date") or ""
     upload_iso = (
@@ -99,10 +110,26 @@ class YouTubeClient:
             opts["proxy"] = self._s.proxy
         if self._s.cookies_file:
             opts["cookiefile"] = str(self._s.cookies_file)
+        deno = _deno_path()
+        if deno:
+            # YouTube's signature/n challenges need a JS runtime; the deno wheel
+            # ships one, but its bin dir is not always on PATH.
+            opts["js_runtimes"] = {"deno": {"path": deno}}
+        if self._s.pot_provider_url:
+            opts["extractor_args"] = {
+                "youtubepot-bgutilhttp": {"base_url": [self._s.pot_provider_url]}
+            }
         return opts
 
     def _extract(self, ref: VideoRef, opts: dict, download: bool) -> dict:
-        opts = {**self._base_opts(), **opts}
+        base = self._base_opts()
+        extractor_args = {
+            **base.get("extractor_args", {}),
+            **opts.get("extractor_args", {}),
+        }
+        opts = {**base, **opts}
+        if extractor_args:
+            opts["extractor_args"] = extractor_args
         if opts.get("skip_download"):
             # Metadata and captions need no media format. With cookies, YouTube can
             # return none until its JS challenge is solved; don't fail on that.

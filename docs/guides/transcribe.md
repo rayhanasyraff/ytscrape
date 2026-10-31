@@ -68,6 +68,7 @@ for the full list. The most useful ones:
 | `WHISPER_API_BASE_URL` / `WHISPER_API_KEY` | – | For `openai-compatible` |
 | `HTTPS_PROXY` / `YTDLP_PROXY` | – | Proxy for YouTube requests (see below) |
 | `YTDLP_COOKIES_FILE` / `YTDLP_COOKIES` | – | YouTube cookies for yt-dlp: a cookies.txt path, or its contents |
+| `YTDLP_POT_PROVIDER_URL` | – | bgutil PO-token server, e.g. `http://host:4416` (see below) |
 
 ## Hosting
 
@@ -88,6 +89,12 @@ request fails with `BOT_CHECK`. Two fixes:
   `YTDLP_COOKIES_FILE` to its path, or paste the contents into `YTDLP_COOKIES`.
   This covers the transcription tools only. Use a throwaway Google account:
   cookies expire, and YouTube can restrict accounts used for automation.
+- **PO-token provider (free, no cookies):** run the
+  [bgutil server](https://github.com/Brainicism/bgutil-ytdlp-pot-provider)
+  (Docker image `brainicism/bgutil-ytdlp-pot-provider`, port 4416) next to the
+  app and set `YTDLP_POT_PROVIDER_URL` to it. The `transcribe` extra already
+  installs the yt-dlp plugin and a Deno runtime. Often enough on cloud IPs, but
+  not guaranteed; combine with a proxy if YouTube still blocks.
 
 ## Web UI
 
