@@ -47,7 +47,7 @@ class _QuietLogger:
 
 def _deno_path() -> str | None:
     try:
-        from deno import find_deno_bin
+        from deno import find_deno_bin  # type: ignore[import-untyped]
     except ImportError:
         return None
     try:

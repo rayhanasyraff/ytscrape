@@ -16,6 +16,25 @@ def test_ytdlp_proxy_wins_over_standard_variables(tmp_path):
     assert YouTubeClient(s)._base_opts()["proxy"] == "http://a:1"
 
 
+def test_youtube_proxy_reaches_ytdlp(tmp_path, monkeypatch):
+    from ytscrape.transcribe.youtube.url_parser import parse_video_ref
+
+    seen = _capture_ytdlp_opts(monkeypatch)
+    s = make_settings(
+        tmp_path,
+        YOUTUBE_PROXY="socks5h://tailscale.railway.internal:1055",
+        HTTPS_PROXY="http://warp-railway.railway.internal:3128",
+    )
+    YouTubeClient(s).fetch_metadata(parse_video_ref("_0gtiMi5AzI"))
+    # An explicit proxy replaces yt-dlp's environment proxies entirely.
+    assert seen[0]["proxy"] == "socks5h://tailscale.railway.internal:1055"
+
+
+def test_ytdlp_proxy_still_overrides_youtube_proxy(tmp_path):
+    s = make_settings(tmp_path, YTDLP_PROXY="http://a:1", YOUTUBE_PROXY="socks5h://b:2")
+    assert s.proxy == "http://a:1"
+
+
 def test_https_proxy_is_used_when_ytdlp_proxy_unset(tmp_path):
     s = make_settings(tmp_path, HTTPS_PROXY="http://b:2")
     assert s.proxy == "http://b:2"
@@ -49,9 +68,7 @@ def _capture_ytdlp_opts(monkeypatch):
         def extract_info(self, url, download):
             return {"id": "_0gtiMi5AzI", "title": "t"}
 
-    monkeypatch.setattr(
-        "ytscrape.transcribe.youtube.client.yt_dlp.YoutubeDL", FakeYDL
-    )
+    monkeypatch.setattr("ytscrape.transcribe.youtube.client.yt_dlp.YoutubeDL", FakeYDL)
     return seen
 
 

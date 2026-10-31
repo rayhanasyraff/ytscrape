@@ -220,7 +220,42 @@ class TestNext:
         assert "videoId" not in payload
 
 
+class _RecordingSession(requests.Session):
+    """Real Session whose send() records the proxies requests resolved."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.sent_proxies: list[dict[str, str]] = []
+
+    def send(self, request: Any, **kwargs: Any) -> requests.Response:
+        self.sent_proxies.append(dict(kwargs.get("proxies") or {}))
+        response = requests.Response()
+        response.status_code = 200
+        response._content = b"ok"
+        response.url = request.url
+        return response
+
+
 class TestProxies:
+    def test_explicit_proxy_beats_environment_proxy(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A stale HTTPS_PROXY in the environment must not hijack an explicit one.
+        monkeypatch.setenv("HTTPS_PROXY", "http://warp-railway.railway.internal:3128")
+        session = _RecordingSession()
+        tailscale = "socks5h://tailscale.railway.internal:1055"
+        client = InnerTubeClient(session=session, proxies={"https": tailscale})
+        client.get_text("https://www.youtube.com/api/timedtext?v=x")
+        assert session.sent_proxies[0]["https"] == tailscale
+
+    def test_environment_proxy_still_used_without_explicit_one(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("HTTPS_PROXY", "http://env-proxy:8080")
+        session = _RecordingSession()
+        InnerTubeClient(session=session).get_text("https://www.youtube.com/x")
+        assert session.sent_proxies[0]["https"] == "http://env-proxy:8080"
+
     def test_proxies_applied_to_session(self) -> None:
         proxies = {"https": "http://user:pass@proxy:8080"}
         client = InnerTubeClient(proxies=proxies)

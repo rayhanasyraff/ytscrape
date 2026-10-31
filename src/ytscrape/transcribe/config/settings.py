@@ -145,12 +145,17 @@ class Settings:
             caption_timeout=_int(env, "CAPTION_TIMEOUT", 90),
             audio_download_timeout=_int(env, "AUDIO_DOWNLOAD_TIMEOUT", 1800),
             transcription_timeout=_int(env, "TRANSCRIPTION_TIMEOUT", 7200),
-            # YTDLP_PROXY wins; otherwise the standard proxy variables apply, the
-            # same ones ytscrape's own requests honour.
+            # YTDLP_PROXY (yt-dlp only) wins, then YOUTUBE_PROXY (shared with the
+            # ytscrape tools), then the standard proxy variables. An explicit
+            # proxy replaces yt-dlp's environment proxies; socks5h:// works.
             proxy=_get(
                 env,
                 "YTDLP_PROXY",
-                _get(env, "HTTPS_PROXY", _get(env, "HTTP_PROXY", "")),
+                _get(
+                    env,
+                    "YOUTUBE_PROXY",
+                    _get(env, "HTTPS_PROXY", _get(env, "HTTP_PROXY", "")),
+                ),
             ),
             cookies_file=_cookies_file(env, temp_dir),
             # bgutil PO-token server (github.com/Brainicism/bgutil-ytdlp-pot-provider)

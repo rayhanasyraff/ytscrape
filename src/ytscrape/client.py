@@ -393,6 +393,13 @@ class InnerTubeClient:
     ) -> Any:
         policy = self._retry
         attempts = policy.max_retries + 1
+        # requests lets HTTP(S)_PROXY from the environment override the session's
+        # own proxies; passing them per request makes an explicit proxy win.
+        # Without one, the environment variables still apply as before.
+        extra: dict[str, Any] = {}
+        session_proxies = getattr(self._session, "proxies", None)
+        if session_proxies:
+            extra["proxies"] = dict(session_proxies)
         for attempt in range(attempts):
             self._rate_limiter.wait()
             started = time.monotonic()
@@ -400,11 +407,15 @@ class InnerTubeClient:
             try:
                 if method == "POST":
                     response = self._session.post(
-                        url, json=json, headers=headers, timeout=self._timeout
+                        url,
+                        json=json,
+                        headers=headers,
+                        timeout=self._timeout,
+                        **extra,
                     )
                 else:
                     response = self._session.get(
-                        url, headers=headers, timeout=self._timeout
+                        url, headers=headers, timeout=self._timeout, **extra
                     )
             except (requests.ConnectionError, requests.Timeout) as exc:
                 if policy.retry_on_connection_errors and attempt + 1 < attempts:
