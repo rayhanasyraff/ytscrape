@@ -15,6 +15,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   video has. Missing comments raise the new `CommentNotFound`.
 - `get_comment` MCP tool (replies include `parent_id`) and `ytscrape comment`
   CLI command for the same lookup.
+- Optional `transcribe` extra (`ytscrape[mcp,transcribe]`): the former
+  *youtube-transcript-mcp* server now ships inside ytscrape as
+  `ytscrape.transcribe`. `ytscrape-mcp` registers its 12 tools automatically
+  when the extra is installed: `youtube_transcribe` (caption-first, with a
+  local faster-whisper or OpenAI-compatible fallback, cached), transcript
+  search, segments, chapters, summaries, key moments, topics, version diffs
+  and job status/cancel. Its resources and prompts come along too. Pass
+  `--no-transcribe` to leave them out. Settings come from environment
+  variables or `.env` (see `.env.example`). `ytscrape-transcribe-ui` starts
+  the local web UI.
+
+### Fixed
+
+- `youtube_generate_summary` returned its error responses (e.g. "transcribe
+  first") as a generic tool failure, because its return annotation only
+  allowed text.
 
 ## [2.2.0] — 2026-10-18
 

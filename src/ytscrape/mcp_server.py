@@ -27,7 +27,9 @@ from __future__ import annotations
 
 import argparse
 import base64
+import importlib.util
 import json
+import logging
 from collections.abc import Callable, Iterable, Mapping
 from functools import wraps
 from typing import Any, Literal, TypeVar, cast
@@ -43,7 +45,9 @@ from .filters import CommentSort, SearchFilter
 from .transcripts import Transcript
 from .youtube import YouTube
 
-__all__ = ["build_server", "main"]
+__all__ = ["build_server", "main", "transcribe_available"]
+
+logger = logging.getLogger(__name__)
 
 _F = TypeVar("_F", bound=Callable[..., Any])
 
@@ -430,6 +434,16 @@ def _transcript_payload(
     return payload
 
 
+# Imported when the transcription tools load; the rest of ``ytscrape[transcribe]``
+# (faster-whisper, httpx, rapidfuzz) is imported lazily on first use.
+_TRANSCRIBE_MODULES = ("yt_dlp", "dotenv")
+
+
+def transcribe_available() -> bool:
+    """Whether the optional ``ytscrape[transcribe]`` dependencies are installed."""
+    return all(importlib.util.find_spec(name) for name in _TRANSCRIBE_MODULES)
+
+
 def build_server(
     *,
     client: YouTube | None = None,
@@ -437,6 +451,7 @@ def build_server(
     region: str = "US",
     timeout: float = 30.0,
     proxies: Mapping[str, str] | None = None,
+    transcribe: bool | None = None,
 ) -> MCPServer:
     """Build the MCP server with every ytscrape tool registered.
 
@@ -451,14 +466,25 @@ def build_server(
             ``{"https": "http://user:pass@host:8080"}``. When omitted, the
             standard ``HTTP_PROXY`` / ``HTTPS_PROXY`` / ``NO_PROXY`` environment
             variables are honoured by the underlying ``requests`` session.
+        transcribe: Also register the transcription tools (``youtube_transcribe``
+            with its faster-whisper fallback, transcript search, chapters,
+            summaries, …). ``None`` enables them when ``ytscrape[transcribe]``
+            is installed; they read their settings from environment variables.
     """
+    if transcribe is None:
+        transcribe = transcribe_available()
+    instructions = _SERVER_INSTRUCTIONS
+    if transcribe:
+        from .transcribe.server import INSTRUCTIONS as TRANSCRIBE_INSTRUCTIONS
+
+        instructions = f"{instructions}\n\n{TRANSCRIBE_INSTRUCTIONS}"
     yt = client or YouTube(
         language=language, region=region, timeout=timeout, proxies=proxies
     )
     server = MCPServer(
         "ytscrape",
         version=__version__,
-        instructions=_SERVER_INSTRUCTIONS,
+        instructions=instructions,
     )
 
     @server.tool(annotations=_read_only("Search YouTube"))
@@ -695,6 +721,11 @@ def build_server(
             payload["hint"] = "Response was cut to fit the context window."
         return payload
 
+    if transcribe:
+        from .transcribe.server import register
+
+        register(server)
+
     return server
 
 
@@ -765,6 +796,15 @@ def _build_parser() -> argparse.ArgumentParser:
         default=8000,
         help="Port for HTTP transports (default: 8000).",
     )
+    parser.add_argument(
+        "--no-transcribe",
+        dest="transcribe",
+        action="store_false",
+        default=None,
+        help=(
+            "Skip the transcription tools even when ytscrape[transcribe] is installed."
+        ),
+    )
     return parser
 
 
@@ -794,6 +834,7 @@ def main(argv: list[str] | None = None) -> int:
         region=args.region,
         timeout=args.timeout,
         proxies=_resolve_proxies(args),
+        transcribe=args.transcribe,
     )
     match args.transport:
         case "streamable-http":

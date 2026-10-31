@@ -1,1 +1,1 @@
-ytscrape[mcp] @ https://github.com/rayhanasyraff/ytscrape/archive/refs/heads/main.zip
+ytscrape[mcp,transcribe] @ https://github.com/rayhanasyraff/ytscrape/archive/refs/heads/main.zip
