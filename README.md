@@ -74,9 +74,6 @@ YouTube through ytscrape — no API key, no quota:
 
 ```bash
 pip install "ytscrape[mcp]"
-# add caption-first transcription with a faster-whisper fallback, transcript
-# search, chapters and summaries (formerly youtube-transcript-mcp):
-pip install "ytscrape[mcp,transcribe]"
 ```
 
 ```json

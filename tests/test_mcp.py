@@ -149,7 +149,7 @@ class FakeYouTube:
 
 
 def _build(fake: FakeYouTube) -> Any:
-    return build_server(client=cast(YouTube, fake), transcribe=False)
+    return build_server(client=cast(YouTube, fake))
 
 
 async def _call_tool(server: Any, name: str, arguments: dict[str, Any]) -> Any:
@@ -166,36 +166,6 @@ def test_all_tools_registered() -> None:
     server = _build(FakeYouTube())
     tools = asyncio.run(_list_tools(server))
     assert {tool.name for tool in tools} == _EXPECTED_TOOLS
-
-
-def test_transcribe_tools_join_the_same_server() -> None:
-    pytest.importorskip("yt_dlp", reason="needs the ytscrape[transcribe] extra")
-    server = build_server(client=cast(YouTube, FakeYouTube()), transcribe=True)
-    tools = {tool.name: tool for tool in asyncio.run(_list_tools(server))}
-    assert tools.keys() >= _EXPECTED_TOOLS
-    assert {"youtube_transcribe", "youtube_search_transcript"} <= tools.keys()
-    cancel = tools["youtube_cancel_transcription"].annotations
-    assert cancel is not None
-    assert cancel.read_only_hint is False
-
-
-def test_transcribe_tools_skipped_without_extra(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    import importlib.util
-
-    from ytscrape import mcp_server
-
-    monkeypatch.setattr(importlib.util, "find_spec", lambda name: None)
-    assert mcp_server.transcribe_available() is False
-    server = build_server(client=cast(YouTube, FakeYouTube()))
-    tools = asyncio.run(_list_tools(server))
-    assert {tool.name for tool in tools} == _EXPECTED_TOOLS
-
-
-def test_no_transcribe_flag_parses() -> None:
-    assert _build_parser().parse_args(["--no-transcribe"]).transcribe is False
-    assert _build_parser().parse_args([]).transcribe is None
 
 
 def test_tools_are_annotated_read_only() -> None:
