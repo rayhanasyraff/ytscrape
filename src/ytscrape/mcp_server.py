@@ -30,6 +30,7 @@ import base64
 import importlib.util
 import json
 import logging
+import os
 from collections.abc import Callable, Iterable, Mapping
 from functools import wraps
 from typing import Any, Literal, TypeVar, cast
@@ -818,15 +819,17 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _resolve_proxies(args: argparse.Namespace) -> dict[str, str] | None:
-    """Build the proxies mapping from CLI arguments.
+    """Build the proxies mapping from CLI arguments or ``YOUTUBE_PROXY``.
 
-    Per-scheme flags win over the combined ``--proxy``. When no proxy flag is
-    given the mapping is ``None``, letting the underlying ``requests`` session
-    fall back to the standard environment variables (``HTTP_PROXY`` /
-    ``HTTPS_PROXY`` / ``NO_PROXY``).
+    Per-scheme flags win over the combined ``--proxy``, which wins over the
+    ``YOUTUBE_PROXY`` environment variable (handy on hosts like Railway that
+    configure through variables; ``socks5://`` works too). With none of them
+    set the mapping is ``None``, letting the underlying ``requests`` session
+    fall back to the standard ``HTTP_PROXY`` / ``HTTPS_PROXY`` / ``NO_PROXY``.
     """
-    http = args.http_proxy or args.proxy
-    https = args.https_proxy or args.proxy
+    env_proxy = os.getenv("YOUTUBE_PROXY") or None
+    http = args.http_proxy or args.proxy or env_proxy
+    https = args.https_proxy or args.proxy or env_proxy
     proxies = {
         scheme: url
         for scheme, url in (("http", http), ("https", https))

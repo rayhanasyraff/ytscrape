@@ -543,8 +543,29 @@ def test_per_scheme_flags_override_proxy() -> None:
     ) == {"http": "http://http-only:3128", "https": "http://both:8080"}
 
 
-def test_no_proxy_flags_yield_none() -> None:
+def test_no_proxy_flags_yield_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("YOUTUBE_PROXY", raising=False)
     assert _proxies() is None
+
+
+def test_youtube_proxy_variable_applies_when_no_flags(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("YOUTUBE_PROXY", "socks5://user:pass@proxy:1080")
+    assert _proxies() == {
+        "http": "socks5://user:pass@proxy:1080",
+        "https": "socks5://user:pass@proxy:1080",
+    }
+
+
+def test_proxy_flags_override_youtube_proxy_variable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("YOUTUBE_PROXY", "socks5://env:1080")
+    assert _proxies("--proxy", "http://flag:8080") == {
+        "http": "http://flag:8080",
+        "https": "http://flag:8080",
+    }
 
 
 def test_environment_proxies_apply_when_no_flags(
