@@ -33,6 +33,47 @@ def test_cookies_pasted_into_a_variable_become_a_private_file(tmp_path):
     assert YouTubeClient(s)._base_opts()["cookiefile"] == str(s.cookies_file)
 
 
+def _capture_ytdlp_opts(monkeypatch):
+    seen: list[dict] = []
+
+    class FakeYDL:
+        def __init__(self, opts):
+            seen.append(opts)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def extract_info(self, url, download):
+            return {"id": "_0gtiMi5AzI", "title": "t"}
+
+    monkeypatch.setattr(
+        "ytscrape.transcribe.youtube.client.yt_dlp.YoutubeDL", FakeYDL
+    )
+    return seen
+
+
+def test_metadata_does_not_fail_when_no_formats_are_returned(tmp_path, monkeypatch):
+    from ytscrape.transcribe.youtube.url_parser import parse_video_ref
+
+    seen = _capture_ytdlp_opts(monkeypatch)
+    YouTubeClient(make_settings(tmp_path)).fetch_metadata(
+        parse_video_ref("_0gtiMi5AzI")
+    )
+    assert seen[0]["ignore_no_formats_error"] is True
+
+
+def test_audio_download_still_requires_a_format(tmp_path, monkeypatch):
+    from ytscrape.transcribe.youtube.url_parser import parse_video_ref
+
+    seen = _capture_ytdlp_opts(monkeypatch)
+    client = YouTubeClient(make_settings(tmp_path))
+    client._extract(parse_video_ref("_0gtiMi5AzI"), {"format": "bestaudio"}, True)
+    assert "ignore_no_formats_error" not in seen[0]
+
+
 def test_cookies_file_path_is_used_as_is(tmp_path):
     s = make_settings(tmp_path, YTDLP_COOKIES_FILE="/data/cookies.txt")
     assert str(s.cookies_file).replace("\\", "/") == "/data/cookies.txt"

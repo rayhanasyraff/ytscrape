@@ -102,8 +102,13 @@ class YouTubeClient:
         return opts
 
     def _extract(self, ref: VideoRef, opts: dict, download: bool) -> dict:
+        opts = {**self._base_opts(), **opts}
+        if opts.get("skip_download"):
+            # Metadata and captions need no media format. With cookies, YouTube can
+            # return none until its JS challenge is solved; don't fail on that.
+            opts["ignore_no_formats_error"] = True
         try:
-            with yt_dlp.YoutubeDL({**self._base_opts(), **opts}) as ydl:
+            with yt_dlp.YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(ref.url, download=download)
         except yt_dlp.utils.DownloadError as e:
             raise map_ytdlp_error(e) from e
