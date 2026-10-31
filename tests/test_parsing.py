@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from urllib.parse import unquote
+
+import pytest
+
 from ytscrape import Channel, Playlist, Video
 from ytscrape.parsing import (
     find_comments_continuation,
@@ -12,6 +16,7 @@ from ytscrape.parsing import (
     iter_renderers,
     parse_comments_page,
     parse_item,
+    with_highlighted_comment,
 )
 
 
@@ -436,3 +441,47 @@ class TestParseCommentsPage:
 
     def test_empty_response_returns_empty_list(self) -> None:
         assert parse_comments_page({}) == []
+
+
+# Tokens captured from YouTube: the comments token of the watch page, and the
+# one the same page issues when opened with ``&lc=<id>`` (URL-quoted as served).
+_COMMENTS_TOKEN = (
+    "Eg0SCzFMZW1RUVV1U1dJGAYyJSIRIgsxTGVtUVFVdVNXSTAAeAJCEGNvbW1lbnRzLXNlY3Rpb24%3D"
+)
+_LINKED_TOKEN = (
+    "Eg0SCzFMZW1RUVV1U1dJGAYyQiIuIgsxTGVtUVFVdVNXSTAAeAKCARpVZ3lhNkl1SGxnVzB5bUVY"
+    "akk5NEFhQUJBZ0IQY29tbWVudHMtc2VjdGlvbg%3D%3D"
+)
+_LINKED_REPLY_TOKEN = (
+    "Eg0SCzFMZW1RUVV1U1dJGAYyWSJFIgsxTGVtUVFVdVNXSTAAeAKCATFVZ3hiRk96NjBaWnV1QWp1"
+    "cDJ0NEFhQUJBZy5BY1dMR09ON2Y1X0FjYXNYOWpIbTBjQhBjb21tZW50cy1zZWN0aW9u"
+)
+
+
+def _normalized(token: str) -> str:
+    return unquote(token).rstrip("=")
+
+
+class TestWithHighlightedComment:
+    def test_matches_token_youtube_issues_for_lc_links(self) -> None:
+        token = with_highlighted_comment(_COMMENTS_TOKEN, "Ugya6IuHlgW0ymEXjI94AaABAg")
+        assert token is not None
+        assert _normalized(token) == _normalized(_LINKED_TOKEN)
+
+    def test_matches_token_for_reply_ids(self) -> None:
+        token = with_highlighted_comment(
+            _COMMENTS_TOKEN, "UgxbFOz60ZZuuAjup2t4AaABAg.AcWLGON7f5_AcasX9jHm0c"
+        )
+        assert token is not None
+        assert _normalized(token) == _normalized(_LINKED_REPLY_TOKEN)
+
+    def test_replaces_existing_highlight(self) -> None:
+        token = with_highlighted_comment(
+            _LINKED_REPLY_TOKEN, "Ugya6IuHlgW0ymEXjI94AaABAg"
+        )
+        assert token is not None
+        assert _normalized(token) == _normalized(_LINKED_TOKEN)
+
+    @pytest.mark.parametrize("token", ["", "CT", "not base64 at all!", "EgA="])
+    def test_unexpected_layout_returns_none(self, token: str) -> None:
+        assert with_highlighted_comment(token, "Ugx") is None

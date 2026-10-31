@@ -280,6 +280,45 @@ with YouTube() as yt:
 
 ***
 
+### `comment`
+
+Fetch a single comment or reply by its id. This mirrors opening a shared comment link, which pins
+the linked comment to the top of the feed, and costs two requests however many comments the video
+has.
+
+```python
+def comment(self, link: str, comment_id: str | None = None) -> Comment
+```
+
+**`link`** (`str`) **required**
+
+:   A comment link (`watch?v=…&lc=<comment id>`), or a video id / URL when `comment_id` is given.
+
+
+**`comment_id`** (`str | None`)
+
+:   The comment or reply id. Reply ids have the form `<parent id>.<suffix>`. Overrides the link's
+      `lc` parameter.
+
+
+**Returns:** [`Comment`](models-comments.md). Replies have `is_reply` set to `True`.
+
+**Raises:** `CommentNotFound` if the comment is not on the video (deleted, held for review, or
+another video's id). `ParseError` if no comment id is given or the comments section cannot be found.
+
+```python
+from ytscrape import YouTube
+
+with YouTube() as yt:
+    reply = yt.comment(
+        "https://youtube.com/watch?v=1LemQQUuSWI"
+        "&lc=UgxbFOz60ZZuuAjup2t4AaABAg.AcWLGON7f5_AcasX9jHm0c"
+    )
+    parent = yt.comment("1LemQQUuSWI", reply.comment_id.split(".")[0])
+```
+
+***
+
 ### `transcript`
 
 Fetch a transcript (captions track) for a video.
@@ -478,6 +517,7 @@ Locale arguments (`locale`, `language`, `region`) behave like on `YouTube`.
 | `await yt.video(video)` | `VideoDetails` |
 | `await yt.channel(channel)` | `ChannelDetails` |
 | `await yt.comments(video, *, max_results=..., include_replies=..., sort=...)` | `AsyncCommentThread` |
+| `await yt.comment(link, comment_id=None)` | `Comment` |
 | `await yt.transcript(video, *, languages=..., preserve_formatting=...)` | `Transcript` |
 | `await yt.transcripts(video)` | `TranscriptList` |
 | `await yt.aclose()` / `await yt.close()` | `None` |

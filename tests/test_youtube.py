@@ -9,13 +9,20 @@ import pytest
 from ytscrape import (
     Channel,
     ChannelDetails,
+    CommentNotFound,
     CommentSort,
     ParseError,
     SearchFilter,
     VideoDetails,
     YouTube,
 )
+from ytscrape.parsing import with_highlighted_comment
 from ytscrape.results import CommentThread, SearchResults
+
+# A real comments-section token (see tests/test_parsing.py).
+_COMMENTS_TOKEN = (
+    "Eg0SCzFMZW1RUVV1U1dJGAYyJSIRIgsxTGVtUVFVdVNXSTAAeAJCEGNvbW1lbnRzLXNlY3Rpb24%3D"
+)
 
 
 class FakeClient:
@@ -350,6 +357,55 @@ class TestYouTubeComments:
         yt = YouTube(client=client)
         with pytest.raises(ValueError, match="Unknown comment sort"):
             yt.comments("dQw4w9WgXcQ", sort="oldest")
+
+
+class TestYouTubeComment:
+    def test_reads_lc_parameter_and_highlights_it(self) -> None:
+        client = FakeClient(comments_token=_COMMENTS_TOKEN)
+        yt = YouTube(client=client)
+        comment = yt.comment("https://youtube.com/watch?v=dQw4w9WgXcQ&lc=c1&si=x")
+        assert comment.comment_id == "c1"
+        assert client.next_calls == [
+            {"video_id": "dQw4w9WgXcQ", "continuation": None},
+            {
+                "video_id": None,
+                "continuation": with_highlighted_comment(_COMMENTS_TOKEN, "c1"),
+            },
+        ]
+
+    def test_comment_id_overrides_lc(self) -> None:
+        client = FakeClient(comments_token=_COMMENTS_TOKEN)
+        yt = YouTube(client=client)
+        comment = yt.comment("https://youtu.be/dQw4w9WgXcQ?lc=other", "c1")
+        assert comment.comment_id == "c1"
+
+    def test_missing_comment_id_raises(self) -> None:
+        yt = YouTube(client=FakeClient(comments_token=_COMMENTS_TOKEN))
+        with pytest.raises(ParseError, match="No comment id"):
+            yt.comment("dQw4w9WgXcQ")
+
+    def test_invalid_comment_id_raises(self) -> None:
+        yt = YouTube(client=FakeClient(comments_token=_COMMENTS_TOKEN))
+        with pytest.raises(ParseError, match="Invalid comment id"):
+            yt.comment("dQw4w9WgXcQ", "bad id")
+
+    def test_absent_comment_raises_not_found(self) -> None:
+        # YouTube serves the normal feed when the linked id does not exist.
+        yt = YouTube(client=FakeClient(comments_token=_COMMENTS_TOKEN))
+        with pytest.raises(CommentNotFound) as excinfo:
+            yt.comment("dQw4w9WgXcQ", "gone")
+        assert excinfo.value.video_id == "dQw4w9WgXcQ"
+        assert excinfo.value.comment_id == "gone"
+
+    def test_without_comments_section_raises(self) -> None:
+        yt = YouTube(client=FakeClient(comments_token=None))
+        with pytest.raises(ParseError, match="comments section"):
+            yt.comment("dQw4w9WgXcQ", "c1")
+
+    def test_unexpected_token_format_raises(self) -> None:
+        yt = YouTube(client=FakeClient())  # the fake's default token is "CT"
+        with pytest.raises(ParseError, match="token format"):
+            yt.comment("dQw4w9WgXcQ", "c1")
 
 
 class TestYouTubeLifecycle:

@@ -187,6 +187,29 @@ ytscrape comments dQw4w9WgXcQ --max 0 --sort newest
 
 ***
 
+## `comment`
+
+Fetch a single comment or reply, for example from a shared comment link.
+
+```
+ytscrape comment <link> [--id COMMENT_ID]
+```
+
+| Argument / Flag | Type              | Default | Description                                                          |
+| --------------- | ----------------- | ------- | -------------------------------------------------------------------- |
+| `link`          | positional string | —       | Comment link (`watch?v=…&lc=<id>`), or a video ID / URL with `--id`. |
+| `--id`          | string            | —       | Comment or reply ID. Overrides the link's `lc` parameter.            |
+
+```bash
+# Straight from a shared link (quote it: it contains '&')
+ytscrape comment "https://youtube.com/watch?v=pzQZ_NDEzVo&lc=UgwQKmjqsX7KXAHghBZ4AaABAg"
+
+# Video plus id, as JSON
+ytscrape comment pzQZ_NDEzVo --id UgwQKmjqsX7KXAHghBZ4AaABAg --format json
+```
+
+***
+
 ## `transcript`
 
 Fetch and print the caption transcript for a YouTube video. Before the transcript lines, a summary header is printed in the form `# <video_id> | <language_code> | generated=<bool> | snippets=<count>`. Each subsequent line is printed with its timestamp offset and duration: `[   12.40 +  4.20] Hello world`.

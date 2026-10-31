@@ -137,6 +137,22 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    comment = sub.add_parser(
+        "comment",
+        help="Fetch a single comment or reply (e.g. from a shared comment link).",
+    )
+    _add_shared_flags(comment, suppress_defaults=True)
+    comment.add_argument(
+        "link",
+        help="Comment link ('watch?v=…&lc=<id>'), or a video id/URL with --id.",
+    )
+    comment.add_argument(
+        "--id",
+        dest="comment_id",
+        default=None,
+        help="Comment or reply id (overrides the link's 'lc' parameter).",
+    )
+
     transcript = sub.add_parser(
         "transcript",
         help="Fetch captions / transcript for a video.",

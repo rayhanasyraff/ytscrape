@@ -38,6 +38,7 @@ _EXPECTED_TOOLS = {
     "get_channel",
     "get_channel_videos",
     "get_comments",
+    "get_comment",
     "get_transcript",
     "list_transcripts",
 }
@@ -99,6 +100,12 @@ class FakeYouTube:
             Comment(comment_id="c1", text="top comment", author="A"),
             Comment(comment_id="c2", text="a reply", author="B", is_reply=True),
         ]
+
+    def comment(self, link: str, comment_id: str | None = None) -> Comment:
+        self.calls.append(("comment", {"link": link, "comment_id": comment_id}))
+        if comment_id and "." in comment_id:
+            return Comment(comment_id=comment_id, text="a reply", is_reply=True)
+        return Comment(comment_id=comment_id or "c1", text="top comment")
 
     def transcript(
         self,
@@ -224,6 +231,30 @@ def test_get_channel_videos_returns_list() -> None:
     )
     assert result.structured_content["items"][0]["video_id"] == "vid2"
     assert result.structured_content["has_more"] is False
+
+
+def test_get_comment_returns_single_comment() -> None:
+    fake = FakeYouTube()
+    link = "https://youtube.com/watch?v=vid1&lc=c1"
+    result = asyncio.run(_call_tool(_build(fake), "get_comment", {"link": link}))
+    assert fake.calls == [("comment", {"link": link, "comment_id": None})]
+    data = result.structured_content
+    assert data["comment_id"] == "c1"
+    assert data["truncated"] is False
+    assert "parent_id" not in data
+
+
+def test_get_comment_reply_carries_parent_id() -> None:
+    result = asyncio.run(
+        _call_tool(
+            _build(FakeYouTube()),
+            "get_comment",
+            {"link": "vid1", "comment_id": "Ugx1.Ac2"},
+        )
+    )
+    data = result.structured_content
+    assert data["is_reply"] is True
+    assert data["parent_id"] == "Ugx1"
 
 
 def test_get_comments_passes_sort_and_replies() -> None:

@@ -18,7 +18,12 @@ from .context import ContextCache
 from .exceptions import ParseError
 from .filters import CommentSort, SearchFilter
 from .locale import Country, Language, Locale
-from .models import ChannelDetails, VideoDetails, _about_continuation_token
+from .models import (
+    ChannelDetails,
+    Comment,
+    VideoDetails,
+    _about_continuation_token,
+)
 from .transcripts import (
     Transcript,
     TranscriptList,
@@ -30,6 +35,8 @@ from .youtube import (
     _CHANNEL_ID_RE,
     _HANDLE_RE,
     YouTube,
+    _linked_comment_token,
+    _pick_comment,
 )
 
 __all__ = ["AsyncYouTube"]
@@ -225,6 +232,14 @@ class AsyncYouTube:
             max_results=max_results,
             include_replies=include_replies,
         )
+
+    async def comment(self, link: str, comment_id: str | None = None) -> Comment:
+        """Fetch a single comment or reply by its id (see :meth:`YouTube.comment`)."""
+        video_id, comment_id = YouTube._split_comment_link(link, comment_id)
+        watch_page = await self._client.next(video_id)
+        token = _linked_comment_token(watch_page, video_id, comment_id)
+        page = await self._client.next(continuation=token)
+        return _pick_comment(page, video_id, comment_id)
 
     async def close(self) -> None:
         """Close the underlying HTTP session."""

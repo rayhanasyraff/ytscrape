@@ -522,6 +522,18 @@ def run_comments(yt: YouTube, args: argparse.Namespace) -> None:
             print(f"{prefix}{comment.author}: {comment.text}")
 
 
+def run_comment(yt: YouTube, args: argparse.Namespace) -> None:
+    with Spinner("loading comment…", enabled=spinner_on(args)):
+        comment = yt.comment(args.link, args.comment_id)
+    if args.output_format in {"json", "csv"}:
+        emit_export(args, comment)
+    elif use_table(args):
+        print(comment_table([comment], enabled=colour(args)))
+    else:
+        prefix = "↳ " if comment.is_reply else ""
+        print(f"{prefix}{comment.author}: {comment.text}")
+
+
 def run_transcript(yt: YouTube, args: argparse.Namespace) -> None:
     pretty = use_table(args)
     color = colour(args)
@@ -569,5 +581,6 @@ COMMANDS: dict[str, Callable[[YouTube, argparse.Namespace], None]] = {
     "video": run_video,
     "channel": run_channel,
     "comments": run_comments,
+    "comment": run_comment,
     "transcript": run_transcript,
 }

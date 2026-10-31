@@ -35,6 +35,28 @@ with YouTube() as yt:
 
 When `include_replies=True`, `max_results` counts replies alongside top-level comments.
 
+## A single comment or reply
+
+When you copy a comment's link, YouTube adds its id as the `lc` parameter
+(`watch?v=…&lc=<comment id>`). `yt.comment()` takes that link and fetches just
+that comment. It makes two requests however many comments the video has:
+
+```python
+with YouTube() as yt:
+    comment = yt.comment(
+        "https://youtube.com/watch?v=pzQZ_NDEzVo&lc=UgwQKmjqsX7KXAHghBZ4AaABAg"
+    )
+    print(comment.author, comment.like_count, comment.text)
+
+    # Or pass the video and the id separately
+    comment = yt.comment("pzQZ_NDEzVo", "UgwQKmjqsX7KXAHghBZ4AaABAg")
+```
+
+Reply ids have the form `<parent id>.<suffix>`. A reply comes back with
+`is_reply=True`; pass the part before the dot to read the comment it answers.
+If the comment was deleted, is held for review, or belongs to another video,
+`yt.comment()` raises `CommentNotFound`.
+
 ## Export JSON / CSV
 
 `CommentThread` can serialize itself — no need to wrap it in `list()` first.
@@ -173,6 +195,8 @@ async def main() -> None:
 
 asyncio.run(main())
 ```
+
+`await yt.comment(link, comment_id=None)` fetches a single comment, like the sync method.
 
 To collect comments from **many videos** faster, gather independent tasks on one shared client (see [Async API](async.md) and `examples/10_async_concurrency.py`).
 

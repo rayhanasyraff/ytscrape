@@ -166,3 +166,12 @@ def test_video_pairs_include_new_fields() -> None:
     assert pairs["Length"] == "12s"
     assert pairs["Published"] == "2009-10-25"
     assert pairs["Category"] == "Music"
+
+
+def test_comment_command_parses_link_and_id() -> None:
+    parser = _build_parser()
+    args = parser.parse_args(["comment", "https://youtu.be/x?lc=Ugx", "--id", "Ugy"])
+    assert args.command == "comment"
+    assert args.link == "https://youtu.be/x?lc=Ugx"
+    assert args.comment_id == "Ugy"
+    assert parser.parse_args(["comment", "link"]).comment_id is None

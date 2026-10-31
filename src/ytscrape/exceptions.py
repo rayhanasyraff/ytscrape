@@ -102,6 +102,19 @@ class ParseError(YtScraperError):
     """Raised when a YouTube response cannot be parsed as expected."""
 
 
+class CommentNotFound(YtScraperError):
+    """Raised when a linked comment is not on the video (deleted, held, wrong id)."""
+
+    def __init__(self, video_id: str, comment_id: str) -> None:
+        self.video_id = video_id
+        self.comment_id = comment_id
+        super().__init__(
+            f"Comment {comment_id!r} was not found on video {video_id!r} "
+            "(it may have been deleted, held for review, or belong to "
+            "another video)."
+        )
+
+
 class TranscriptError(YtScraperError):
     """Base class for transcript / caption related failures."""
 

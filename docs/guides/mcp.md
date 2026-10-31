@@ -33,6 +33,7 @@ MCP support depends on the [`mcp`](https://pypi.org/project/mcp/) SDK. It is **n
 | `get_channel` | `YouTube.channel` | accepts an id, `@handle` or channel URL |
 | `get_channel_videos` | `YouTube.channel_videos` | a channel's uploads (Videos tab) |
 | `get_comments` | `YouTube.comments` | `sort="newest"` collects *every* comment; `include_replies` adds replies |
+| `get_comment` | `YouTube.comment` | one comment or reply from a shared link (`&lc=<id>`); replies include `parent_id` |
 | `get_transcript` | `YouTube.transcript` | plain text, plus timed snippets with `include_timestamps` |
 | `list_transcripts` | `YouTube.transcripts` | available caption tracks |
 

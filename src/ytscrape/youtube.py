@@ -4,15 +4,21 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from . import parsing
 from .client import InnerTubeClient, RateLimiter, RetryPolicy, check_playability
 from .context import ContextCache
-from .exceptions import ParseError
+from .exceptions import CommentNotFound, ParseError
 from .filters import CommentSort, SearchFilter
 from .locale import Country, Language, Locale
-from .models import ChannelDetails, VideoDetails, _about_continuation_token
+from .models import (
+    ChannelDetails,
+    Comment,
+    VideoDetails,
+    _about_continuation_token,
+)
 from .results import ChannelVideos, CommentThread, SearchResults
 from .transcripts import (
     Transcript,
@@ -26,6 +32,8 @@ __all__ = ["YouTube"]
 _VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 _CHANNEL_ID_RE = re.compile(r"^UC[\w-]{22}$")
 _HANDLE_RE = re.compile(r"^@[\w.-]{3,}$")
+# Top-level ids look like ``Ugx…AaABAg``; replies append ``.<reply suffix>``.
+_COMMENT_ID_RE = re.compile(r"^[\w-]+(?:\.[\w-]+)?$")
 _CHANNEL_ID_IN_HTML_RE = re.compile(
     r'"(?:externalId|channelId|browseId)":"(UC[\w-]{22})"'
 )
@@ -317,6 +325,38 @@ class YouTube:
             include_replies=include_replies,
         )
 
+    def comment(self, link: str, comment_id: str | None = None) -> Comment:
+        """Fetch a single comment or reply by its id.
+
+        Pass a shared comment link — the ``lc=`` parameter YouTube adds when
+        you copy a comment's link — or a video id/URL plus ``comment_id``::
+
+            with YouTube() as yt:
+                c = yt.comment("https://youtube.com/watch?v=pzQZ_NDEzVo"
+                               "&lc=UgwQKmjqsX7KXAHghBZ4AaABAg")
+                print(c.author, c.text)
+
+        Reply ids have the form ``<parent id>.<suffix>``; the returned reply
+        has :attr:`~ytscrape.models.Comment.is_reply` set. This costs two
+        requests regardless of how many comments the video has.
+
+        Args:
+            link: A video id or any YouTube URL that contains one. When
+                ``comment_id`` is omitted, the URL's ``lc`` parameter is used.
+            comment_id: The comment or reply id. Overrides ``lc``.
+
+        Raises:
+            CommentNotFound: If the comment is not on the video (deleted,
+                held for review, or the id belongs to another video).
+            ParseError: If no comment id is given, or the comments section
+                cannot be located (e.g. comments are disabled).
+        """
+        video_id, comment_id = self._split_comment_link(link, comment_id)
+        watch_page = self._client.next(video_id)
+        token = _linked_comment_token(watch_page, video_id, comment_id)
+        page = self._client.next(continuation=token)
+        return _pick_comment(page, video_id, comment_id)
+
     def close(self) -> None:
         """Close the underlying HTTP session."""
         self._client.close()
@@ -347,6 +387,22 @@ class YouTube:
                 return segment
 
         raise ParseError(f"Could not extract a video id from {value!r}.")
+
+    @staticmethod
+    def _split_comment_link(value: str, comment_id: str | None) -> tuple[str, str]:
+        """Return ``(video_id, comment_id)`` from a link and an optional id."""
+        if comment_id is None:
+            query = parse_qs(urlparse(value.strip()).query)
+            comment_id = query.get("lc", [None])[0]
+            if not comment_id:
+                raise ParseError(
+                    f"No comment id in {value!r}: pass a link with an 'lc=' "
+                    "parameter or set comment_id."
+                )
+        comment_id = comment_id.strip()
+        if not _COMMENT_ID_RE.match(comment_id):
+            raise ParseError(f"Invalid comment id {comment_id!r}.")
+        return YouTube._normalize_video_id(value), comment_id
 
     def _normalize_channel_id(self, value: str) -> str:
         """Extract a ``UC…`` channel id from an id, handle or URL."""
@@ -399,3 +455,30 @@ class YouTube:
         if match:
             return match.group(1)
         raise ParseError(f"Could not resolve a channel id from {url!r}.")
+
+
+def _linked_comment_token(
+    watch_page: dict[str, Any], video_id: str, comment_id: str
+) -> str:
+    """Build the comments token that puts ``comment_id`` at the top."""
+    token = parsing.find_comments_continuation(watch_page)
+    if token is None:
+        raise ParseError(
+            f"Could not find a comments section for video {video_id!r} "
+            "(comments may be disabled)."
+        )
+    linked = parsing.with_highlighted_comment(token, comment_id)
+    if linked is None:
+        raise ParseError(
+            f"Unexpected comments token format for video {video_id!r}; "
+            "cannot look up a single comment."
+        )
+    return linked
+
+
+def _pick_comment(page: dict[str, Any], video_id: str, comment_id: str) -> Comment:
+    """Return ``comment_id`` from a highlighted-comment page."""
+    for comment in parsing.parse_comments_page(page):
+        if comment.comment_id == comment_id:
+            return comment
+    raise CommentNotFound(video_id, comment_id)

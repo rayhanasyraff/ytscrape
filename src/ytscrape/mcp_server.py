@@ -19,8 +19,8 @@ For hosted setups the server also speaks Streamable HTTP and SSE::
 
 The tools are read-only and map directly to the :class:`~ytscrape.YouTube`
 facade: ``search_videos``, ``get_video``, ``get_channel``,
-``get_channel_videos``, ``get_comments``, ``get_transcript`` and
-``list_transcripts``.
+``get_channel_videos``, ``get_comments``, ``get_comment``, ``get_transcript``
+and ``list_transcripts``.
 """
 
 from __future__ import annotations
@@ -124,7 +124,8 @@ _SERVER_INSTRUCTIONS = (
     "Scrape public YouTube data without an API key. Use search_videos to find "
     "videos, get_video / get_channel / get_channel_videos for metadata, "
     "get_comments for comments (sort='newest' collects every comment, "
-    "include_replies adds replies) and get_transcript / list_transcripts for "
+    "include_replies adds replies), get_comment for one comment or reply "
+    "from a shared link ('&lc=<id>') and get_transcript / list_transcripts for "
     "captions. List tools return items plus has_more and next_cursor — pass "
     f"next_cursor to continue instead of raising max_results (capped at "
     f"{_MAX_RESULTS}); each page re-reads the listing from the start, so "
@@ -606,6 +607,31 @@ def build_server(
                 else None
             ),
         )
+
+    @server.tool(annotations=_read_only("Get Single Comment"))
+    @_translate_errors
+    def get_comment(link: str, comment_id: str | None = None) -> dict[str, Any]:
+        """Fetch one comment or reply by id, e.g. from a shared comment link.
+
+        Comment links carry the id in their 'lc' parameter
+        ('watch?v=<video>&lc=<comment id>'). Reply ids look like
+        '<parent id>.<suffix>'; replies carry 'is_reply' set to true and a
+        'parent_id' you can pass back here to read the comment they answer.
+        Costs two requests however many comments the video has.
+
+        Args:
+            link: A comment link, or a video id / URL when comment_id is set.
+            comment_id: The comment or reply id. Overrides the link's 'lc'.
+        """
+        data = to_dict(yt.comment(link, comment_id))
+        if data.get("is_reply"):
+            data["parent_id"] = data["comment_id"].split(".", 1)[0]
+        truncated = _json_len(data) > _MAX_CHARS
+        if truncated:
+            data = _shrink_mapping(data, _MAX_CHARS)
+            data["hint"] = "Comment text was cut to fit the context window."
+        data["truncated"] = truncated
+        return data
 
     @server.tool(annotations=_read_only("Get Transcript"))
     @_translate_errors

@@ -7,9 +7,11 @@ the package can stay declarative.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+import base64
+from collections.abc import Callable, Iterator
 from dataclasses import replace
 from typing import Any
+from urllib.parse import unquote
 
 from .models import Channel, Comment, Playlist, Video
 
@@ -24,6 +26,7 @@ __all__ = [
     "parse_channel_videos",
     "parse_comments_page",
     "parse_item",
+    "with_highlighted_comment",
 ]
 
 # Maps a renderer key to the model responsible for parsing it.
@@ -341,6 +344,118 @@ def find_next_comments_continuation(response: Any) -> str | None:
         return None
 
     return _walk(response)
+
+
+# Comments continuation tokens are base64-encoded protobuf messages. Opening a
+# ``watch?v=…&lc=<comment id>`` link makes YouTube add the linked comment's id
+# as field 16 of the comment-options message (field 6 → field 4), which pins
+# that comment (or reply, nested under its parent) to the top of the feed.
+_COMMENT_OPTIONS_PATH = (6, 4)
+_HIGHLIGHTED_COMMENT_FIELD = 16
+_WIRE_VARINT, _WIRE_FIXED64, _WIRE_BYTES, _WIRE_FIXED32 = 0, 1, 2, 5
+
+
+def _read_varint(data: bytes, pos: int) -> tuple[int, int]:
+    result = shift = 0
+    while True:
+        if pos >= len(data):
+            raise ValueError("truncated varint")
+        byte = data[pos]
+        pos += 1
+        result |= (byte & 0x7F) << shift
+        if byte < 0x80:
+            return result, pos
+        shift += 7
+
+
+def _encode_varint(value: int) -> bytes:
+    out = bytearray()
+    while value > 0x7F:
+        out.append((value & 0x7F) | 0x80)
+        value >>= 7
+    out.append(value)
+    return bytes(out)
+
+
+def _proto_fields(data: bytes) -> list[tuple[int, int, bytes]]:
+    """Split a protobuf message into ``(field, wire_type, raw_value)`` triples."""
+    fields: list[tuple[int, int, bytes]] = []
+    pos = 0
+    while pos < len(data):
+        key, pos = _read_varint(data, pos)
+        number, wire = key >> 3, key & 7
+        if wire == _WIRE_VARINT:
+            start = pos
+            _, pos = _read_varint(data, pos)
+            value = data[start:pos]
+        elif wire in (_WIRE_FIXED64, _WIRE_FIXED32):
+            size = 8 if wire == _WIRE_FIXED64 else 4
+            value = data[pos : pos + size]
+            pos += size
+        elif wire == _WIRE_BYTES:
+            length, pos = _read_varint(data, pos)
+            value = data[pos : pos + length]
+            pos += length
+        else:
+            raise ValueError(f"unsupported wire type {wire}")
+        if pos > len(data):
+            raise ValueError("truncated field")
+        fields.append((number, wire, value))
+    return fields
+
+
+def _proto_join(fields: list[tuple[int, int, bytes]]) -> bytes:
+    out = bytearray()
+    for number, wire, value in fields:
+        out += _encode_varint(number << 3 | wire)
+        if wire == _WIRE_BYTES:
+            out += _encode_varint(len(value))
+        out += value
+    return bytes(out)
+
+
+def _edit_message(
+    data: bytes, path: tuple[int, ...], edit: Callable[[bytes], bytes]
+) -> bytes:
+    """Apply ``edit`` to the sub-message found by following field ``path``."""
+    if not path:
+        return edit(data)
+    fields = _proto_fields(data)
+    for i, (number, wire, value) in enumerate(fields):
+        if number == path[0] and wire == _WIRE_BYTES:
+            fields[i] = (number, wire, _edit_message(value, path[1:], edit))
+            return _proto_join(fields)
+    raise ValueError(f"field {path[0]} not found")
+
+
+def with_highlighted_comment(token: str, comment_id: str) -> str | None:
+    """Return a copy of a comments-section ``token`` that highlights a comment.
+
+    Fetching the returned token mirrors opening a ``watch?v=…&lc=<id>`` link:
+    YouTube puts the linked comment first (a linked reply comes right after
+    its parent). Pass the token from :func:`find_comments_continuation`.
+    When ``comment_id`` does not exist YouTube silently serves the regular
+    feed, so callers must check the ids they get back.
+
+    Returns ``None`` when the token does not have the expected layout.
+    """
+
+    def _set_highlight(options: bytes) -> bytes:
+        fields = [
+            field
+            for field in _proto_fields(options)
+            if field[0] != _HIGHLIGHTED_COMMENT_FIELD
+        ]
+        fields.append((_HIGHLIGHTED_COMMENT_FIELD, _WIRE_BYTES, comment_id.encode()))
+        return _proto_join(fields)
+
+    raw = unquote(token)
+    try:
+        message = base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4))
+        patched = _edit_message(message, _COMMENT_OPTIONS_PATH, _set_highlight)
+    except ValueError:  # also covers binascii.Error
+        return None
+    return base64.urlsafe_b64encode(patched).decode("ascii")
 
 
 def _thread_comment_id(thread: dict[str, Any]) -> str | None:

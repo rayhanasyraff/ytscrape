@@ -175,6 +175,14 @@ def test_comments(yt: YouTube) -> None:
     assert all(c.text for c in comments)
 
 
+def test_comment_by_id(yt: YouTube) -> None:
+    first = next(iter(yt.comments(VIDEO_ID, max_results=1)))
+    link = f"https://www.youtube.com/watch?v={VIDEO_ID}&lc={first.comment_id}"
+    comment = yt.comment(link)
+    assert comment.comment_id == first.comment_id
+    assert comment.text == first.text
+
+
 def test_transcript(yt: YouTube) -> None:
     transcript = yt.transcript(VIDEO_ID)
     assert list(transcript)

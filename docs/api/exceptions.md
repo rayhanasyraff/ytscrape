@@ -15,6 +15,7 @@ YtScraperError
 ├── ContextExtractionError
 ├── RequestError
 ├── ParseError
+├── CommentNotFound
 └── TranscriptError
     ├── TranscriptsDisabled
     └── NoTranscriptFound
@@ -28,6 +29,7 @@ from ytscrape import (
     ContextExtractionError,
     RequestError,
     ParseError,
+    CommentNotFound,
     TranscriptError,
     TranscriptsDisabled,
     NoTranscriptFound,
@@ -76,6 +78,17 @@ Raised when an HTTP request to a YouTube InnerTube endpoint fails. This covers n
 Raised when a YouTube API response cannot be parsed into the expected structure. This can happen if YouTube changes its response schema, returns an unexpected payload, or when comments are disabled for a video and the expected comment continuation data is absent.
 
 **Extra attributes:** none beyond the message string.
+
+***
+
+## `CommentNotFound`
+
+**Inherits from:** `YtScraperError`
+
+Raised by `yt.comment()` when the requested comment is not on the video. The comment may have been
+deleted or held for review, or the id may belong to another video.
+
+**Attributes:** `video_id` (`str`), `comment_id` (`str`).
 
 ***
 

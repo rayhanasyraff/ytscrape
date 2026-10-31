@@ -107,6 +107,7 @@ in `env` instead):
 | `get_channel` | Channel metadata (id, `@handle` or URL) |
 | `get_channel_videos` | Channel uploads (Videos tab) |
 | `get_comments` | Comments — `sort="newest"` for *every* comment, `include_replies` adds replies |
+| `get_comment` | One comment or reply from a shared link (`&lc=<id>`) |
 | `get_transcript` | Transcript text (+ timed snippets on request) |
 | `list_transcripts` | Available caption tracks |
 
@@ -216,6 +217,7 @@ asyncio.run(main())
 | Search — videos / channels / playlists / Shorts / movies | ✅ | `SearchFilter.*`                                       |
 | Video & channel metadata | ✅ | `video()`, `channel()` (id, URL, `@handle`)            |
 | Comments + replies | ✅ | `comments()`, `CommentSort.NEWEST` for *every* comment |
+| Single comment / reply by link | ✅ | `comment()` reads the `lc=` id from shared links       |
 | Transcripts / captions | ✅ | `transcript()` / `transcripts()`                       |
 | Pagination | ✅ | Transparent for search and comments                    |
 | Localisation (`hl` / `gl`) | ✅ | Validated ISO codes                                    |

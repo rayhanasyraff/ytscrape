@@ -14,12 +14,18 @@ from ytscrape import (
     AsyncCommentThread,
     AsyncSearchResults,
     AsyncYouTube,
+    CommentNotFound,
     CommentSort,
     ParseError,
     SearchFilter,
     VideoDetails,
 )
 from ytscrape.async_client import AsyncInnerTubeClient
+
+# A real comments-section token (see tests/test_parsing.py).
+_COMMENTS_TOKEN = (
+    "Eg0SCzFMZW1RUVV1U1dJGAYyJSIRIgsxTGVtUVFVdVNXSTAAeAJCEGNvbW1lbnRzLXNlY3Rpb24%3D"
+)
 
 
 class FakeAsyncClient:
@@ -225,6 +231,27 @@ class TestAsyncYouTubeComments:
             yt = AsyncYouTube(client=client)  # type: ignore[arg-type]
             with pytest.raises(ParseError, match="comments section"):
                 await yt.comments("dQw4w9WgXcQ")
+
+        _run(body())
+
+
+class TestAsyncYouTubeComment:
+    def test_comment_from_link(self) -> None:
+        async def body() -> None:
+            client = FakeAsyncClient(comments_token=_COMMENTS_TOKEN)
+            yt = AsyncYouTube(client=client)  # type: ignore[arg-type]
+            comment = await yt.comment("https://youtube.com/watch?v=dQw4w9WgXcQ&lc=c1")
+            assert comment.comment_id == "c1"
+            assert len(client.next_calls) == 2
+
+        _run(body())
+
+    def test_absent_comment_raises_not_found(self) -> None:
+        async def body() -> None:
+            client = FakeAsyncClient(comments_token=_COMMENTS_TOKEN)
+            yt = AsyncYouTube(client=client)  # type: ignore[arg-type]
+            with pytest.raises(CommentNotFound):
+                await yt.comment("dQw4w9WgXcQ", "gone")
 
         _run(body())
 

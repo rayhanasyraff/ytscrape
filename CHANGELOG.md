@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `YouTube.comment()` / `AsyncYouTube.comment()` fetch a single comment or
+  reply by id, straight from a shared comment link (`watch?v=…&lc=<id>`) or a
+  video plus `comment_id`. It takes two requests however many comments the
+  video has. Missing comments raise the new `CommentNotFound`.
+- `get_comment` MCP tool (replies include `parent_id`) and `ytscrape comment`
+  CLI command for the same lookup.
+
 ## [2.2.0] — 2026-10-18
 
 ### Added
