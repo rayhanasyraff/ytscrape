@@ -87,7 +87,7 @@ class YouTubeClient:
         self._s = settings
 
     def _base_opts(self) -> dict:
-        return {
+        opts = {
             "quiet": True,
             "no_warnings": True,
             "noprogress": True,
@@ -95,6 +95,11 @@ class YouTubeClient:
             "retries": 3,
             "logger": _QuietLogger(),
         }
+        if self._s.proxy:
+            opts["proxy"] = self._s.proxy
+        if self._s.cookies_file:
+            opts["cookiefile"] = str(self._s.cookies_file)
+        return opts
 
     def _extract(self, ref: VideoRef, opts: dict, download: bool) -> dict:
         try:

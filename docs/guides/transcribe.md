@@ -66,6 +66,8 @@ for the full list. The most useful ones:
 | `CACHE_DIR` / `TEMP_DIR` | `./data/cache` / `./data/tmp` | Relative to the working directory |
 | `MAX_VIDEO_DURATION` | `14400` | Longest video (seconds) the pipeline accepts |
 | `WHISPER_API_BASE_URL` / `WHISPER_API_KEY` | – | For `openai-compatible` |
+| `HTTPS_PROXY` / `YTDLP_PROXY` | – | Proxy for YouTube requests (see below) |
+| `YTDLP_COOKIES_FILE` / `YTDLP_COOKIES` | – | YouTube cookies for yt-dlp: a cookies.txt path, or its contents |
 
 ## Hosting
 
@@ -74,8 +76,38 @@ only, or `WHISPER_MODEL=tiny` / `base` with `DEVICE=cpu` and `COMPUTE_TYPE=int8`
 to keep memory and CPU use down. Point `CACHE_DIR` at a persistent volume if you
 want transcripts to survive redeploys.
 
+## "Sign in to confirm you're not a bot"
+
+YouTube often flags cloud IPs (Railway, Fly, AWS, …), and then every transcript
+request fails with `BOT_CHECK`. Two fixes:
+
+- **Proxy (most reliable):** set `HTTPS_PROXY=http://user:pass@host:port`. Both
+  ytscrape's own requests and yt-dlp use it. Residential proxies work best.
+- **Cookies (free):** export YouTube cookies from a logged-in browser as a
+  Netscape `cookies.txt` (e.g. with a "Get cookies.txt" extension), then set
+  `YTDLP_COOKIES_FILE` to its path, or paste the contents into `YTDLP_COOKIES`.
+  This covers the transcription tools only. Use a throwaway Google account:
+  cookies expire, and YouTube can restrict accounts used for automation.
+
 ## Web UI
 
-`ytscrape-transcribe-ui` starts a local web page at <http://127.0.0.1:8765>
-with a player-synced transcript, search and summaries. It shares the cache with
-the MCP server.
+The transcript page has a player-synced transcript, search, chapters and
+summaries. It shares the cache with the MCP tools.
+
+- **Hosted:** `ytscrape-mcp --transport streamable-http` serves it under
+  `/transcribe/` next to `/mcp` (`/` redirects there). Open a video directly by
+  appending any YouTube link:
+
+  ```
+  https://your-host/transcribe/result?url=https://www.youtube.com/watch?v=VIDEO_ID
+  ```
+
+  Links with extra parameters (`&t=`, `&si=`) work as-is; `?v=VIDEO_ID` works
+  too. Pass `--no-web` to serve `/mcp` only.
+- **Local:** `ytscrape-transcribe-ui` runs the page alone at
+  <http://127.0.0.1:8765>.
+
+!!! warning
+
+    The hosted page is public, like `/mcp`: anyone with the URL can start
+    transcriptions on your server.

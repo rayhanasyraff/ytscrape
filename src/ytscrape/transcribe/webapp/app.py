@@ -1,11 +1,12 @@
-"""Local web UI for youtube-transcript-mcp.
+"""Web UI for ytscrape's transcription tools.
 
 Reuses the same pipeline, cache and search index as the MCP server (imported from
-ytscrape.transcribe.server.context), so anything transcribed here is also available to MCP clients
-and vice versa.
+ytscrape.transcribe.server.context), so anything transcribed here is also available
+to MCP clients and vice versa.
 
-Run:  python -m ytscrape.transcribe.webapp.app     ->  http://127.0.0.1:8765
-Binds to localhost only; this is a personal tool, not a public service.
+``ytscrape-mcp --transport streamable-http`` serves it under ``/transcribe/``, where
+``/transcribe/result?url=<YouTube link>`` opens a video directly.
+``ytscrape-transcribe-ui`` runs it alone on http://127.0.0.1:8765.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from starlette.responses import FileResponse, JSONResponse
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
+from ytscrape import __version__
 from ytscrape.transcribe.server import context
 from ytscrape.transcribe.transcript.chapters import (
     from_description,
@@ -61,7 +63,7 @@ def _ref_from(value: str):
 
 async def health(request):
     return JSONResponse(
-        {"ok": True, "app": "youtube-transcript-mcp", "version": "0.1.0"}
+        {"ok": True, "app": "ytscrape-transcribe", "version": __version__}
     )
 
 
@@ -243,6 +245,7 @@ def create_app() -> Starlette:
     return Starlette(
         routes=[
             Route("/", index),
+            Route("/result", index),
             Route("/api/health", health),
             Route("/api/metadata", metadata_endpoint, methods=["POST"]),
             Route("/api/transcribe", transcribe_endpoint, methods=["POST"]),

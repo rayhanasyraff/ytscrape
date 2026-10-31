@@ -90,10 +90,12 @@ async function loadVideo() {
   setStatus("Loading metadata…", "busy");
   clearTranscriptView();
   try {
-    const meta = await api("/api/metadata", {
+    const meta = await api("api/metadata", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),
     });
+    // Make the address bar a shareable result?url=<link> for this video.
+    history.replaceState(null, "", `result?url=${url.replace(/#/g, "%23")}`);
     state.videoId = meta.video_id;
     renderMeta(meta);
     ensureVideoLoaded(meta.video_id);
@@ -101,11 +103,11 @@ async function loadVideo() {
     let payload = null;
     try {
       setStatus("Checking cache…", "busy");
-      payload = await api(`/api/transcript?video=${encodeURIComponent(meta.video_id)}`);
+      payload = await api(`api/transcript?video=${encodeURIComponent(meta.video_id)}`);
       setStatus("cached transcript", "");
     } catch {
       setStatus("Fetching transcript (captions-first; whisper may take a while)…", "busy");
-      payload = await api("/api/transcribe", {
+      payload = await api("api/transcribe", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
       });
@@ -223,7 +225,7 @@ async function doSearch() {
   box.classList.remove("hidden");
   box.innerHTML = `<div class="none">Searching…</div>`;
   try {
-    const r = await api(`/api/search?video=${encodeURIComponent(state.videoId)}&q=${encodeURIComponent(q)}&context=1&max=20`);
+    const r = await api(`api/search?video=${encodeURIComponent(state.videoId)}&q=${encodeURIComponent(q)}&context=1&max=20`);
     if (!r.results.length) {
       box.innerHTML = `<div class="none">No matches for “${esc(q)}”.</div>`;
       return;
@@ -277,7 +279,7 @@ async function loadChapters() {
   if (!state.videoId) return;
   $("chapters").innerHTML = `<div class="none">Loading…</div>`;
   try {
-    const r = await api(`/api/chapters?video=${encodeURIComponent(state.videoId)}&ai=1`);
+    const r = await api(`api/chapters?video=${encodeURIComponent(state.videoId)}&ai=1`);
     const el = $("chapters");
     el.innerHTML = "";
     if (!r.chapters.length) {
@@ -322,7 +324,7 @@ $("summary-btn").addEventListener("click", async () => {
   out.classList.remove("hidden");
   out.textContent = "Generating…";
   try {
-    const r = await api("/api/summary", {
+    const r = await api("api/summary", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ video: state.videoId, style: $("summary-style").value }),
     });
@@ -333,3 +335,21 @@ $("summary-btn").addEventListener("click", async () => {
     btn.disabled = false;
   }
 });
+
+/* ---------------------------------------------------------- deep links */
+
+// result?url=<YouTube link> (or ?v=<id>). Everything after "url=" belongs to the
+// link, so its own "&t=" / "&si=" parameters don't need escaping.
+function linkFromLocation() {
+  const m = location.search.match(/[?&]url=(.*)$/);
+  if (m) {
+    try { return decodeURIComponent(m[1]); } catch { return m[1]; }
+  }
+  return new URLSearchParams(location.search).get("v") || "";
+}
+
+const initialLink = linkFromLocation();
+if (initialLink) {
+  $("url-input").value = initialLink;
+  loadVideo();
+}

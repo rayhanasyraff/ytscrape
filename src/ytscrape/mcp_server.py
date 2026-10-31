@@ -805,6 +805,15 @@ def _build_parser() -> argparse.ArgumentParser:
             "Skip the transcription tools even when ytscrape[transcribe] is installed."
         ),
     )
+    parser.add_argument(
+        "--no-web",
+        dest="web",
+        action="store_false",
+        help=(
+            "Don't serve the transcript web UI (/transcribe/) next to /mcp on the "
+            "streamable-http transport."
+        ),
+    )
     return parser
 
 
@@ -826,17 +835,45 @@ def _resolve_proxies(args: argparse.Namespace) -> dict[str, str] | None:
     return proxies or None
 
 
+def http_app(server: MCPServer, *, host: str = "127.0.0.1") -> Any:
+    """The Streamable HTTP app (``/mcp``) plus the transcript web UI.
+
+    The UI lives under ``/transcribe/`` (``/`` redirects there), and
+    ``/transcribe/result?url=<YouTube link>`` opens a video's transcript
+    directly. Needs the transcription tools to be registered on ``server``.
+    """
+    from starlette.responses import RedirectResponse
+    from starlette.routing import Mount, Route
+
+    from .transcribe.webapp.app import create_app as create_web_app
+
+    def to_web_ui(request: Any) -> RedirectResponse:
+        return RedirectResponse("/transcribe/")
+
+    app = server.streamable_http_app(host=host)
+    app.router.routes.extend(
+        [Route("/", to_web_ui), Mount("/transcribe", create_web_app())]
+    )
+    return app
+
+
 def main(argv: list[str] | None = None) -> int:
     """Entry point for the ``ytscrape-mcp`` console script."""
     args = _build_parser().parse_args(argv)
+    transcribe = transcribe_available() if args.transcribe is None else args.transcribe
     server = build_server(
         language=args.language,
         region=args.region,
         timeout=args.timeout,
         proxies=_resolve_proxies(args),
-        transcribe=args.transcribe,
+        transcribe=transcribe,
     )
     match args.transport:
+        case "streamable-http" if transcribe and args.web:  # pragma: no cover
+            import uvicorn
+
+            app = http_app(server, host=args.host)
+            uvicorn.run(app, host=args.host, port=args.port)
         case "streamable-http":
             server.run("streamable-http", host=args.host, port=args.port)
         case "sse":  # pragma: no cover - exercised in live/hosted setups

@@ -85,6 +85,10 @@ class Settings:
     audio_download_timeout: int = 1800
     transcription_timeout: int = 7200
 
+    # getting past YouTube's bot check on cloud IPs
+    proxy: str = ""
+    cookies_file: Path | None = None
+
     # optional features
     enable_diarization: bool = False
     enable_semantic_search: bool = False
@@ -106,6 +110,7 @@ class Settings:
         if env is None:
             load_dotenv(PROJECT_ROOT / ".env")
             env = dict(os.environ)
+        temp_dir = _path(env, "TEMP_DIR", PROJECT_ROOT / "data" / "tmp")
         s = cls(
             transcription_provider=_get(
                 env, "TRANSCRIPTION_PROVIDER", "faster-whisper"
@@ -130,7 +135,7 @@ class Settings:
             cache_dir=_path(env, "CACHE_DIR", PROJECT_ROOT / "data" / "cache"),
             cache_ttl_days=_int(env, "CACHE_TTL_DAYS", 30),
             max_cache_entries=_int(env, "MAX_CACHE_ENTRIES", 1000),
-            temp_dir=_path(env, "TEMP_DIR", PROJECT_ROOT / "data" / "tmp"),
+            temp_dir=temp_dir,
             max_video_duration=_int(env, "MAX_VIDEO_DURATION", 14400),
             max_download_size_mb=_int(env, "MAX_DOWNLOAD_SIZE_MB", 4096),
             max_response_chars=_int(env, "MAX_RESPONSE_CHARS", 60000),
@@ -139,6 +144,14 @@ class Settings:
             caption_timeout=_int(env, "CAPTION_TIMEOUT", 90),
             audio_download_timeout=_int(env, "AUDIO_DOWNLOAD_TIMEOUT", 1800),
             transcription_timeout=_int(env, "TRANSCRIPTION_TIMEOUT", 7200),
+            # YTDLP_PROXY wins; otherwise the standard proxy variables apply, the
+            # same ones ytscrape's own requests honour.
+            proxy=_get(
+                env,
+                "YTDLP_PROXY",
+                _get(env, "HTTPS_PROXY", _get(env, "HTTP_PROXY", "")),
+            ),
+            cookies_file=_cookies_file(env, temp_dir),
             enable_diarization=_bool(env, "ENABLE_DIARIZATION", False),
             enable_semantic_search=_bool(env, "ENABLE_SEMANTIC_SEARCH", False),
             log_level=_get(env, "LOG_LEVEL", "INFO").upper(),
@@ -146,3 +159,22 @@ class Settings:
         )
         s.ensure_dirs()
         return s
+
+
+def _cookies_file(env: dict, temp_dir: Path) -> Path | None:
+    """yt-dlp cookies: a Netscape cookies.txt path, or its contents in YTDLP_COOKIES.
+
+    Hosts like Railway can't easily mount a file, so the contents can be pasted
+    into a variable instead; they are written to a private file in TEMP_DIR.
+    """
+    path = _get(env, "YTDLP_COOKIES_FILE", "")
+    if path:
+        return Path(path)
+    contents = _get(env, "YTDLP_COOKIES", "")
+    if not contents:
+        return None
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    target = temp_dir / "yt-dlp-cookies.txt"
+    target.write_text(contents.replace("\\n", "\n") + "\n", encoding="utf-8")
+    target.chmod(0o600)
+    return target

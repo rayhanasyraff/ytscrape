@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--no-transcribe` to leave them out. Settings come from environment
   variables or `.env` (see `.env.example`). `ytscrape-transcribe-ui` starts
   the local web UI.
+- `ytscrape-mcp --transport streamable-http` also serves that transcript web
+  UI under `/transcribe/` (`/` redirects there). Open a video directly with
+  `/transcribe/result?url=<YouTube link>`. `--no-web` turns it off.
+- Transcription settings for YouTube's bot check on cloud IPs: a proxy
+  (`YTDLP_PROXY`, or the standard `HTTPS_PROXY` / `HTTP_PROXY`) and cookies
+  (`YTDLP_COOKIES_FILE`, or the cookies.txt contents in `YTDLP_COOKIES`).
 
 ### Fixed
 
