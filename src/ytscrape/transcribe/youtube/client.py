@@ -26,7 +26,11 @@ logger = logging.getLogger(__name__)
 
 
 class _QuietLogger:
-    """Swallow yt-dlp's internal logging; errors come back as exceptions."""
+    """Swallow yt-dlp's chatter; errors come back as exceptions.
+
+    Warnings are kept in the server log: that is where yt-dlp reports problems
+    like an unreachable PO-token provider or a missing JS runtime.
+    """
 
     def debug(self, msg, *args):
         pass
@@ -35,7 +39,7 @@ class _QuietLogger:
         pass
 
     def warning(self, msg, *args):
-        pass
+        logger.warning("yt-dlp: %s", msg)
 
     def error(self, msg, *args):
         pass
@@ -100,7 +104,7 @@ class YouTubeClient:
     def _base_opts(self) -> dict:
         opts = {
             "quiet": True,
-            "no_warnings": True,
+            "no_warnings": False,
             "noprogress": True,
             "socket_timeout": self._s.http_timeout,
             "retries": 3,
