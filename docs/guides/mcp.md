@@ -37,6 +37,8 @@ MCP support depends on the [`mcp`](https://pypi.org/project/mcp/) SDK. It is **n
 | `get_transcript` | `YouTube.transcript` | plain text, plus timed snippets with `include_timestamps` |
 | `list_transcripts` | `YouTube.transcripts` | available caption tracks |
 
+With `ytscrape[transcribe]` installed, the same server also offers `youtube_transcribe` (caption-first, with a faster-whisper fallback) and transcript search, chapters and summaries. See [Transcription tools](transcribe.md).
+
 All tools return JSON-friendly dictionaries and are annotated as read-only
 (`readOnlyHint`, `openWorldHint`, `idempotentHint`), so clients can auto-approve
 them safely. ytscrape errors (bot detection, rate limits, unavailable videos,
@@ -173,6 +175,7 @@ python -m ytscrape.mcp_server
 | `--https-proxy` | – | Proxy for HTTPS requests only (overrides `--proxy`) |
 | `--transport` | `stdio` | `stdio`, `streamable-http` or `sse` |
 | `--host` / `--port` | `127.0.0.1` / `8000` | Bind address for HTTP transports |
+| `--no-transcribe` | – | Leave out the [transcription tools](transcribe.md) even when `ytscrape[transcribe]` is installed |
 
 ## Behind a proxy (IP blocks)
 

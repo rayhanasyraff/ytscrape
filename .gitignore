@@ -37,3 +37,7 @@ site/
 
 # Junie
 .junie/
+
+# Transcription extra: local settings (may hold API keys) and cache
+.env
+data/
